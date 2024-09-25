@@ -127,10 +127,9 @@ class PianoRollAudioDataset(Dataset):
         torch.save(data, saved_data_path)
         return data
 
-
 class MAESTRO(PianoRollAudioDataset):
 
-    def __init__(self, path='data/MAESTRO', groups=None, sequence_length=None, seed=42, device=DEFAULT_DEVICE):
+    def __init__(self, path='/media/backup_SSD/Yonghyun/Multimodal_AMT/data/MAESTRO/maestro-v3.0.0', groups=None, sequence_length=None, seed=42, device=DEFAULT_DEVICE):
         super().__init__(path, groups if groups is not None else ['train'], sequence_length, seed, device)
 
     @classmethod
@@ -149,22 +148,32 @@ class MAESTRO(PianoRollAudioDataset):
             if len(files) == 0:
                 raise RuntimeError(f'Group {group} is empty')
         else:
-            metadata = json.load(open(os.path.join(self.path, 'maestro-v1.0.0.json')))
-            files = sorted([(os.path.join(self.path, row['audio_filename'].replace('.wav', '.flac')),
-                             os.path.join(self.path, row['midi_filename'])) for row in metadata if row['split'] == group])
+            metadata = json.load(open(os.path.join(self.path, 'maestro-v3.0.0.json')))
+            group_list = []
+            for idx, value in metadata["split"].items():
+                group_list.append((idx, value))  
+            files = []
+            for idx, val in group_list:
+                if val == group:
+                    files.append((os.path.join(self.path, metadata['audio_filename'][idx].replace('.wav', '.flac')),
+                                    os.path.join(self.path, metadata['midi_filename'][idx])))
 
+            files = sorted(files)
             files = [(audio if os.path.exists(audio) else audio.replace('.flac', '.wav'), midi) for audio, midi in files]
-
+            #print(f"files: {files}")
+            
         result = []
         for audio_path, midi_path in files:
             tsv_filename = midi_path.replace('.midi', '.tsv').replace('.mid', '.tsv')
             if not os.path.exists(tsv_filename):
+                print("non_exist")
                 midi = parse_midi(midi_path)
                 np.savetxt(tsv_filename, midi, fmt='%.6f', delimiter='\t', header='onset,offset,note,velocity')
             result.append((audio_path, tsv_filename))
-        return result
-
-
+            
+            
+        return result # Return First 300 (CUDA out of memory)
+    
 class MAPS(PianoRollAudioDataset):
     def __init__(self, path='data/MAPS', groups=None, sequence_length=None, seed=42, device=DEFAULT_DEVICE):
         super().__init__(path, groups if groups is not None else ['ENSTDkAm', 'ENSTDkCl'], sequence_length, seed, device)
